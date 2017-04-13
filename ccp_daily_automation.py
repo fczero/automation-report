@@ -16,44 +16,68 @@ from pprint import pprint
 import argparse
 
 
-##=====================================================================================================
+##==============================================================================
 ##      NO PY FILE EDITING NEEDED
 ##
-##      The reports will be saved as an XLSX file. Both reports will be made after the script runs.
+##      The reports will be saved as an XLSX file. Both reports will be made
+##      after the script runs.
 ##
 ##      1   Login to the VPN
 ##      2   Execute the runner.sh script
 ##      2.1      $bash runner.sh
 ##        OR
 ##      2.1 give exec permission and run using $./runner.sh
-##=====================================================================================================
+##==============================================================================
 ##       (WINDOWS)
 ##      A.1 on commandline run C:\>  python3 -m venv myenv
 ##      A.2 C:\> <path to script>\Scripts\activate.bat
-##      A.3 SMOKE     C:\> <path to script> python3 'ccp_daily_automation.py' --smoke
+##      A.3 C:\> <path to script> python3 'ccp_daily_automation.py' --smoke
 ##        OR
-##      A.3 REGESSION C:\> <path to script> python3 'ccp_daily_automation.py' --regression
-##=====================================================================================================
-
-
-parser = argparse.ArgumentParser(description='Scrape Jenkins report and create XLSX report.')
-parser.add_argument('-s','--smoke' , help="Generate Smoke Report", action="store_true")
-parser.add_argument('-r','--regression' , help="Generate Regression Report", action="store_true")
-args = parser.parse_args()
-pprint(args)
-
-if args.smoke: 
-    automationReport = 'RCO Smoke Tests'
-    reportFileName = 'RCO_Smoke_Report'
-elif args.regression:
-    automationReport = 'RCO Regression Tests'
-    reportFileName = 'RCO_Smokeless_Regression_Report'
+##      A.3 C:\> <path to script> python3 'ccp_daily_automation.py' --regression
+##==============================================================================
 
 #Global Values
 LINE_WRAP_LENGTH    = 60
-FAILED_SCENARIO_COL = 5
+DURATION_COL_LENGTH = 18
+DURATION_COL        = 5
+FAIL_SC_COLS        = 6
+FAIL_ST_COLS        = 7
+automationReport    = ''
+reportFileName      = ''
+suite               = {}
+devices             = []
+nodes               = []
 
+def init():
+    '''process CLI arguments'''
+    global automationReport 
+    global reportFileName
+    global suite
+    global devices
+    global nodes
 
+    parser = argparse.ArgumentParser(description='Scrape Jenkins report' +
+                                                 ' and create XLSX report.')
+    parser.add_argument('-s', '--smoke', help="Generate Smoke Report",
+                        action="store_true")
+    parser.add_argument('-r','--regression', help="Generate Regression Report",
+                        action="store_true")
+    args = parser.parse_args()
+    pprint(args)
+
+    if args.smoke: 
+        automationReport = 'RCO Smoke Tests'
+        reportFileName = 'RCO_Smoke_Report'
+    elif args.regression:
+        automationReport = 'RCO Regression Tests'
+        reportFileName = 'RCO_Smokeless_Regression_Report'
+
+    suite = {'nodes': [], 'duration': '', 'total': 0, 'failed': 0,
+             'name': automationReport}
+    pprint(suite)
+    devices = ['Desktop', 'Tablet', 'Mobile']
+    #nodes = ['Authentication', 'Confirmation', 'Delivery', 'Payment', 'Review']
+    nodes = ['Confirmation']
 
 def open_file(filename):
     if sys.platform == "win32":
@@ -222,68 +246,72 @@ suiteStyle.fill       = blueFill
 failedStyle            = NamedStyle(name="Failed")
 failedStyle.alignment = Alignment(vertical="center", wrap_text=True)
 
-suite = {'nodes': [], 'duration': '', 'total': 0, 'failed': 0, 'name': automationReport}
-devices = ['Desktop', 'Tablet', 'Mobile']
-nodes = ['Authentication', 'Confirmation', 'Delivery', 'Payment', 'Review']
 
-for node in nodes:
-    for device in devices:
-        newNode = {'name': 'Tags=Checkout_' + node + '_Responsive_' + device, 'features': [], 'duration': '', 'total': 0, 'failed': 0}
-        suite['nodes'].append(newNode)
+def scrapeInfo():
+    global suite
+    global devices
+    global nodes
+    pprint(suite)
+    for node in nodes:
+        for device in devices:
+            newNode = {'name': 'Tags=Checkout_' + node + '_Responsive_' +
+                       device, 'features': [], 'duration': '', 'total': 0,
+                       'failed': 0}
+            suite['nodes'].append(newNode)
 
-driver=wd.Chrome()
-driver.get("http://jenkins.ccp.tm.tmcs/view/RCO/")
-driver.find_element_by_link_text(suite['name']).click()
-for node in suite['nodes']:
-    features = []
-    driver.find_element_by_link_text(node['name']).click()
-    cucumberReport = driver.find_element_by_link_text('Cucumber Reports').click()
-    node['duration'] = driver.find_element_by_id('stats-total-duration').text
-    featureElements = driver.find_elements_by_partial_link_text('Checkout_')
-    featureTexts = []
-    for element in featureElements:
-        featureTexts.append(element.text)
-    for featureText in featureTexts:
-        featureElement = driver.find_element_by_link_text(featureText)
-        feature = {}
-        feature['name'] = featureText
-        feature['total'] = int(driver.find_element_by_id('stats-number-scenarios-' + featureText).text)
-        node['total'] = node['total'] + feature['total']
-        suite['total'] = suite['total'] + feature['total']
-        #feature['failed'] = int(driver.find_element_by_id('stats-number-scenarios-failed-' + featureText).text)
-        #node['failed'] = node['failed'] + feature['failed']
-        #suite['failed'] = suite['failed'] + feature['failed']
-        feature['duration'] = driver.find_element_by_id('stats-duration-' + featureText).text
-        featureElement.click()
-        failures = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='scenario-keyword']")
-        feature['failed'] = len(failures)
-        node['failed'] = node['failed'] + feature['failed']
-        suite['failed'] = suite['failed'] + feature['failed']
-        scenarios = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='scenario-name']")
-        steps = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='step-name']")
-        feature['failureList'] = []
-        feature['failedSteps'] = []
-        feature['failures'] = {}
-        count = 0
-        for num in range(len(failures)):
-            if failures[num].text == 'Background:':
-                feature['failureList'].append(failures[num].text)
-                feature['failures'][failures[num].text] = {'scenario': failures[num].text
-                                                           , 'step': steps[num].text}
-            else:
-                feature['failureList'].append(failures[num].text
-                                              + scenarios[count].text)
-                feature['failures'][failures[num].text
-                                    + scenarios[count].text] = {'scenario': failures[num].text
-                                      + scenarios[count].text, 'step': steps[num].text}
-                count += 1
-            feature['failedSteps'].append(steps[num].text)
-        features.append(feature)
+    driver=wd.Chrome()
+    driver.get("http://jenkins.ccp.tm.tmcs/view/RCO/")
+    driver.find_element_by_link_text(suite['name']).click()
+    for node in suite['nodes']:
+        features = []
+        driver.find_element_by_link_text(node['name']).click()
+        cucumberReport = driver.find_element_by_link_text('Cucumber Reports').click()
+        node['duration'] = driver.find_element_by_id('stats-total-duration').text
+        featureElements = driver.find_elements_by_partial_link_text('Checkout_')
+        featureTexts = []
+        for element in featureElements:
+            featureTexts.append(element.text)
+        for featureText in featureTexts:
+            featureElement = driver.find_element_by_link_text(featureText)
+            feature = {}
+            feature['name'] = featureText
+            feature['total'] = int(driver.find_element_by_id('stats-number-scenarios-' +
+                                                             featureText).text)
+            node['total'] = node['total'] + feature['total']
+            suite['total'] = suite['total'] + feature['total']
+            feature['duration'] = driver.find_element_by_id('stats-duration-' +
+                                                            featureText).text
+            featureElement.click()
+            failures = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='scenario-keyword']")
+            feature['failed'] = len(failures)
+            node['failed'] = node['failed'] + feature['failed']
+            suite['failed'] = suite['failed'] + feature['failed']
+            scenarios = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='scenario-name']")
+            steps = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='step-name']")
+            feature['failureList'] = []
+            feature['failedSteps'] = []
+            feature['failures'] = {}
+            count = 0
+            for num in range(len(failures)):
+                if failures[num].text == 'Background:':
+                    feature['failureList'].append(failures[num].text)
+                    feature['failures'][failures[num].text] = {'scenario': failures[num].text ,
+                                                               'step': steps[num].text}
+                else:
+                    feature['failureList'].append(failures[num].text +
+                                                  scenarios[count].text)
+                    feature['failures'][failures[num].text +
+                                        scenarios[count].text] = {'scenario': failures[num].text +
+                                                                  scenarios[count].text,
+                                                                  'step': steps[num].text}
+                    count += 1
+                feature['failedSteps'].append(steps[num].text)
+            features.append(feature)
+            driver.back()
+        node['features'] = features
         driver.back()
-    node['features'] = features
-    driver.back()
-    driver.back()
-driver.quit()
+        driver.back()
+    driver.quit()
 
 def writeToTextFile(suite, reportFileName):
     reportFileName += '.tsv'
@@ -292,16 +320,18 @@ def writeToTextFile(suite, reportFileName):
                  + '\t' + '"#\nFailed"' + '\t' + 'Duration' + '\t'
                  + 'Failed Scenarios' + '\t' + 'Failed Steps' + '\n')
     report.write(suite['name'] + '\t' +
-                 str(round(100.0*(suite['total']-suite['failed'])/suite['total'],1))
-                 + '%' + '\t' + str(suite['total']) + '\t' + str(suite['failed']) + '\n')
+                 str(round(100.0*(suite['total']-suite['failed'])/suite['total'],
+                           1)) + '%' + '\t' + str(suite['total']) + '\t' +
+                 str(suite['failed']) + '\n')
     for node in suite['nodes']:
         if node['total'] == 0:
             percent = 'No Tests'
         else:
-            percent = str(round(100.0*(node['total']-node['failed'])/node['total']),1) + '%'
-        report.write('"Suite:\n' + node['name'][5:] + '"' + '\t'
-                     + percent + '\t' + str(node['total']) + '\t'
-                     + str(node['failed']) + '\t' + duration(node['duration']) + '\n')
+            percent = str(round(100.0*(node['total']-node['failed'])/
+                                node['total']),1) + '%'
+        report.write('"Suite:\n' + node['name'][5:] + '"' + '\t' + percent +
+                     '\t' + str(node['total']) + '\t' + str(node['failed']) +
+                     '\t' + duration(node['duration']) + '\n')
         for feature in node['features']:
             if feature['total'] == 0:
                 percent = 'No Tests'
@@ -315,12 +345,15 @@ def writeToTextFile(suite, reportFileName):
             count = True
             for failure in feature['failureList']:
                 if count:
-                    report.write(feature['failures'][failure]['scenario'] + '\t'
-                                 + feature['failures'][failure]['step'] + '\n')
+                    report.write(feature['failures'][failure]['scenario'] +
+                                 '\t' + feature['failures'][failure]['step'] +
+                                 '\n')
                     count = False
                 else:
-                    report.write('\t\t\t\t\t' + feature['failures'][failure]['scenario']
-                             + '\t' + feature['failures'][failure]['step'] + '\n')
+                    report.write('\t\t\t\t\t' +
+                                 feature['failures'][failure]['scenario'] +
+                                 '\t' + feature['failures'][failure]['step'] +
+                                 '\n')
             if feature['failed'] == 0:
                 report.write('\n')
     report.close()
@@ -329,14 +362,14 @@ def writeToTextFile(suite, reportFileName):
 
 def writeToExcelFile(suite, excelFileName):
     excelFileName += '.xlsx'
-    wb = Workbook()
-    ws = wb.active
-    header = ('Tests','Success Rate',"# Tests","# Failed",
-              'Duration','Failed Scenarios','Failed Steps')
+    wb             = Workbook()
+    ws             = wb.active
+    header         = ('Tests','Success Rate',"# Tests","# Failed", 'Duration',
+                      'Failed Scenarios','Failed Steps')
     ws.append(header)
-    subHeader = (suite['name'],
-            str(round(100.0*(suite['total'] - suite['failed']) / suite['total'],1)) + '%',
-            str(suite['total']),
+    subHeader      = (suite['name'],
+            str(round(100.0*(suite['total'] - suite['failed']) /
+                      suite['total'],1)) + '%', str(suite['total']),
             str(suite['failed']))
     ws.append(subHeader)
 
@@ -344,7 +377,8 @@ def writeToExcelFile(suite, excelFileName):
         if node['total'] == 0:
             percent = 'No Tests'
         else:
-            percent = str(round(100.0*(node['total']-node['failed'])/node['total'],1)) + '%'
+            percent = str(round(100.0*(node['total'] - node['failed']) /
+                                node['total'],1)) + '%'
 
         row = ("Suite:  " + node['name'][5:],
                 percent ,
@@ -358,18 +392,14 @@ def writeToExcelFile(suite, excelFileName):
             if feature['total'] == 0:
                 percent = 'No Tests'
             else:
-                percent = (str(round(100.0*(feature['total'] - feature['failed'])
-                    / feature['total'],1)) + '%')
-                row = (getFeatureFileName(feature['name']),
-                        percent,
-                        str(feature['total']),
-                        str(feature['failed']),
-                        duration(feature['duration']),
-                        '')
+                percent = (str(round(100.0*(feature['total'] -
+                                            feature['failed']) /
+                                     feature['total'],1)) + '%')
+                row = (getFeatureFileName(feature['name']), percent,
+                        str(feature['total']), str(feature['failed']),
+                        duration(feature['duration']), '')
                 ws.append(row)
 
-            FAIL_SC_COLS = 6
-            FAIL_ST_COLS = 7
             count = True
             for failure in feature['failureList']:
                 if count:
@@ -439,7 +469,7 @@ def writeToExcelFile(suite, excelFileName):
         resizeToFitColumn(ws, i)
 
     #resize duration column
-    resizeColumn(ws, 5, 18)
+    resizeColumn(ws, 5, DURATION_COL_LENGTH)
 
     #resize first row
     resizeRow(ws, 1, 2)
@@ -447,14 +477,21 @@ def writeToExcelFile(suite, excelFileName):
     #resize rows with merged cells
     for row in ws.iter_rows(min_row=3, max_col=1, max_row=ws.max_row):
         for cell in row:
-            failedScenarioCell = cell.offset(column=FAILED_SCENARIO_COL)
+            failedScenarioCell = cell.offset(column=FAIL_SC_COLS-1)
+            failedStepCell = cell.offset(column=FAIL_ST_COLS-1)
+            valueLength = max(map(len,
+                                  map(str,(failedScenarioCell.value,
+                                           failedStepCell.value))))
             if(failedScenarioCell.value):
-                valLen = (len(str(failedScenarioCell.value)))
-                size   = 1 + (valLen // LINE_WRAP_LENGTH)
+                size   = 1 + (valueLength // LINE_WRAP_LENGTH)
                 resizeRow(ws, cell.row, size)
-
+    #save file
     wb.save(excelFileName)
 
 if __name__ == '__main__':
+    pprint(suite)
+    init()
+    pprint(suite)
+    scrapeInfo()
     writeToExcelFile(suite, reportFileName)
     open_file(reportFileName + '.xlsx')
