@@ -13,28 +13,41 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.utils import get_column_letter, rows_from_range
 from openpyxl.utils import units
 from pprint import pprint
+import argparse
 
 
-##The report will save as a text file. Follow the following steps to create the report:
-##0   Login to the VPN
-##0.1 Uncomment the 2 lines for Smoke Tests OR Regression
-##0.2 Change the date on the reportFileName
-##1   Execute the runner.sh script
-##1.1      $bash runner.sh
-##1.1.1 OR give exec permission and run using $./runner.sh
-## (WINDOWS)
-##A.1 on commandline run C:\>  python3 -m venv myenv
-##A.2 C:\> <path to script>\Scripts\activate.bat
-##A.2 C:\> <path to script> python3 'ccp_daily_automation.py'
+##=====================================================================================================
+##      NO PY FILE EDITING NEEDED
+##
+##      The reports will be saved as an XLSX file. Both reports will be made after the script runs.
+##
+##      1   Login to the VPN
+##      2   Execute the runner.sh script
+##      2.1      $bash runner.sh
+##        OR
+##      2.1 give exec permission and run using $./runner.sh
+##=====================================================================================================
+##       (WINDOWS)
+##      A.1 on commandline run C:\>  python3 -m venv myenv
+##      A.2 C:\> <path to script>\Scripts\activate.bat
+##      A.3 SMOKE     C:\> <path to script> python3 'ccp_daily_automation.py' --smoke
+##        OR
+##      A.3 REGESSION C:\> <path to script> python3 'ccp_daily_automation.py' --regression
+##=====================================================================================================
 
 
-####Uncomment the next 2 lines for Smoke report and change the date
-automationReport = 'RCO Smoke Tests'
-reportFileName = 'RCO_Smoke_Report_FL_4_11_2017'
+parser = argparse.ArgumentParser(description='Scrape Jenkins report and create XLSX report.')
+parser.add_argument('-s','--smoke' , help="Generate Smoke Report", action="store_true")
+parser.add_argument('-r','--regression' , help="Generate Regression Report", action="store_true")
+args = parser.parse_args()
+pprint(args)
 
-####Uncomment the next 2 lines for Smokeless Regression report and change the date
-#automationReport = 'RCO Regression Tests'
-#reportFileName = 'RCO_Smokeless_Regression_Report_04-03-17'
+if args.smoke: 
+    automationReport = 'RCO Smoke Tests'
+    reportFileName = 'RCO_Smoke_Report'
+elif args.regression:
+    automationReport = 'RCO Regression Tests'
+    reportFileName = 'RCO_Smokeless_Regression_Report'
 
 #Global Values
 LINE_WRAP_LENGTH    = 60
