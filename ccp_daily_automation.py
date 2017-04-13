@@ -76,8 +76,8 @@ def init():
              'name': automationReport}
     pprint(suite)
     devices = ['Desktop', 'Tablet', 'Mobile']
-    #nodes = ['Authentication', 'Confirmation', 'Delivery', 'Payment', 'Review']
-    nodes = ['Confirmation']
+    nodes = ['Authentication', 'Confirmation', 'Delivery', 'Payment', 'Review']
+    #nodes = ['Confirmation']
 
 def open_file(filename):
     if sys.platform == "win32":
