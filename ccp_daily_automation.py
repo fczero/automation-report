@@ -58,14 +58,20 @@ def init():
 
     parser = argparse.ArgumentParser(description='Scrape Jenkins report' +
                                                  ' and create XLSX report.')
-    parser.add_argument('-s', '--smoke', help="Generate Smoke Report",
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-s', '--smoke', help="Generate Smoke Report",
                         action="store_true")
-    parser.add_argument('-r','--regression', help="Generate Regression Report",
+    group.add_argument('-r','--regression', help="Generate Regression Report",
+                        action="store_true")
+    group.add_argument('-t', '--test', help="Test mode, Smoke Confirmation",
                         action="store_true")
     args = parser.parse_args()
-    pprint(args)
 
-    if args.smoke: 
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+
+    if args.smoke or args.test: 
         automationReport = 'RCO Smoke Tests'
         reportFileName = 'RCO_Smoke_Report'
     elif args.regression:
@@ -74,10 +80,14 @@ def init():
 
     suite = {'nodes': [], 'duration': '', 'total': 0, 'failed': 0,
              'name': automationReport}
-    pprint(suite)
     devices = ['Desktop', 'Tablet', 'Mobile']
-    nodes = ['Authentication', 'Confirmation', 'Delivery', 'Payment', 'Review']
-    #nodes = ['Confirmation']
+
+    if args.test:
+        pprint(args)
+        nodes = ['Confirmation']
+    else:
+        nodes = ['Authentication', 'Confirmation', 'Delivery', 'Payment',
+                 'Review']
 
 def open_file(filename):
     if sys.platform == "win32":
@@ -251,7 +261,6 @@ def scrapeInfo():
     global suite
     global devices
     global nodes
-    pprint(suite)
     for node in nodes:
         for device in devices:
             newNode = {'name': 'Tags=Checkout_' + node + '_Responsive_' +
@@ -489,9 +498,7 @@ def writeToExcelFile(suite, excelFileName):
     wb.save(excelFileName)
 
 if __name__ == '__main__':
-    pprint(suite)
     init()
-    pprint(suite)
     scrapeInfo()
     writeToExcelFile(suite, reportFileName)
     open_file(reportFileName + '.xlsx')
