@@ -570,7 +570,7 @@ if __name__ == '__main__':
         from openpyxl.utils import get_column_letter, rows_from_range
         from openpyxl.utils import units
     except ImportError:
-        print("Not in venv, starting new subprocess")
+        print("Not in venv, starting new subprocess call")
         p = worker(sys.argv[1])
         p.start()
         sys.exit(0)
