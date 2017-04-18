@@ -26,6 +26,7 @@ import os, sys, subprocess
 import multiprocessing as mp
 import venv
 import argparse
+from pprint import pprint
 
 #Global Values
 LINE_WRAP_LENGTH    = 60
@@ -43,7 +44,6 @@ ENV                 = os.path.join('.', ENV_NAME)
 BIN                 = os.path.join(ENV, 'bin')
 PIP                 = os.path.join(BIN,'pip')
 PY                  = os.path.join(BIN,'python3')
-
 
 #janky bootsrap helper funcs
 def argHandler():
@@ -123,27 +123,6 @@ if not os.path.isdir(os.path.join('.', ENV)):
     subprocess.call([PIP, 'install', 'selenium'])
     subprocess.call([PIP, 'install', 'openpyxl'])
 
-#parse args
-argHandler()
-
-#virtual env installed libraries
-try:
-    from openpyxl import Workbook
-except ImportError:
-    print("Import Error, starting new process")
-    p = worker(sys.argv[1])
-    p.start()
-    sys.exit(0)
-
-from selenium import webdriver as wd
-from openpyxl.styles import colors
-from openpyxl.styles import Color, PatternFill, Font, Border, NamedStyle
-from openpyxl.styles import Alignment, Side
-from openpyxl.formatting import Rule
-from openpyxl.formatting.rule import CellIsRule
-from openpyxl.utils import get_column_letter, rows_from_range
-from openpyxl.utils import units
-from pprint import pprint
 
 def checkCompat():
     compatible = True
@@ -271,57 +250,68 @@ def resizeColumn(ws, columnIndex, width):
     columnName = get_column_letter(columnIndex)
     ws.column_dimensions[columnName].width = width
 
-#Red Fill
-redFill = PatternFill(start_color = colors.RED,
-                      end_color   = colors.RED,
-                      fill_type   = 'solid')
+def initStyles():
+    #Red Fill
+    global redFill
+    redFill = PatternFill(start_color = colors.RED,
+                          end_color   = colors.RED,
+                          fill_type   = 'solid')
 
-#Blue Fill
-blueFill = PatternFill(start_color = colors.BLUE,
-                       end_color   = colors.BLUE,
-                       fill_type   = 'solid')
-#Green Fill
-greenFill = PatternFill(start_color = colors.GREEN,
-                          end_color = colors.GREEN,
-                          fill_type = 'solid')
+    #Blue Fill
+    global blueFill
+    blueFill = PatternFill(start_color = colors.BLUE,
+                           end_color   = colors.BLUE,
+                           fill_type   = 'solid')
+    #Green Fill
+    global greenFill
+    greenFill = PatternFill(start_color = colors.GREEN,
+                            end_color = colors.GREEN,
+                            fill_type = 'solid')
 
-#vertical alignment centered 
-vertCenterAl =  Alignment(vertical="center")
+    #vertical alignment centered 
+    global verCenterAl
+    vertCenterAl =  Alignment(vertical="center")
 
-#horizontal centered alignment
-horCenterAl =  Alignment(horizontal="center")
+    #horizontal centered alignment
+    global horCenterAl
+    horCenterAl =  Alignment(horizontal="center")
 
-#centered everything
-centerAl =  Alignment(vertical="center", horizontal="center")
+    #centered everything
+    global centerAl
+    centerAl =  Alignment(vertical="center", horizontal="center")
 
-#thin border
-bd         = Side(style='thin', color="000000")
-thinBorder = Border(left=bd, top=bd, right=bd, bottom=bd)
+    #thin border
+    global thinBorder
+    bd         = Side(style='thin', color="000000")
+    thinBorder = Border(left=bd, top=bd, right=bd, bottom=bd)
 
-#all cells
-defaultStyle           = NamedStyle(name="default")
-defaultStyle.alignment = vertCenterAl
-defaultStyle.border    = thinBorder
+    #all cells
+    global defaultStyle
+    defaultStyle           = NamedStyle(name="default")
+    defaultStyle.alignment = vertCenterAl
+    defaultStyle.border    = thinBorder
 
 
-#blue highlight with white text style
-blueHighlight           = NamedStyle(name="blueHighlight")
-blueHighlight.font      = Font(color=colors.WHITE)
-blueHighlight.alignment = centerAl
-blueHighlight.border    = thinBorder
-blueHighlight.fill      = blueFill
+    #blue highlight with white text style
+    global blueHighlight
+    blueHighlight           = NamedStyle(name="blueHighlight")
+    blueHighlight.font      = Font(color=colors.WHITE)
+    blueHighlight.alignment = centerAl
+    blueHighlight.border    = thinBorder
+    blueHighlight.fill      = blueFill
 
-#suite header style
-suiteStyle            = NamedStyle(name="Suite")
-suiteStyle.font       = Font(color=colors.WHITE)
-suiteStyle.alignment  = Alignment(vertical="center", horizontal="center")
-suiteStyle.border     = thinBorder
-suiteStyle.fill       = blueFill
+    #suite header style
+    global suiteStyle
+    suiteStyle            = NamedStyle(name="Suite")
+    suiteStyle.font       = Font(color=colors.WHITE)
+    suiteStyle.alignment  = Alignment(vertical="center", horizontal="center")
+    suiteStyle.border     = thinBorder
+    suiteStyle.fill       = blueFill
 
-#failed cells style
-failedStyle            = NamedStyle(name="Failed")
-failedStyle.alignment = Alignment(vertical="center", wrap_text=True)
-
+    #failed cells style
+    global failedStyle
+    failedStyle            = NamedStyle(name="Failed")
+    failedStyle.alignment = Alignment(vertical="center", wrap_text=True)
 
 def scrapeInfo():
     global suite
@@ -487,7 +477,7 @@ def writeToExcelFile(suite, excelFileName):
                     count = False
                 else:
                     ws.append(
-                        {FAIL_SC_COLS: feature['failures'][failure]['scenario'],
+                        {Ò[MaÒ[MaÒ[MaÒ[MaÒ[MaÒFAIL_SC_COLS: feature['failures'][failure]['scenario'],
                         FAIL_ST_COLS: feature['failures'][failure]['step']})
 
     #merging
@@ -564,6 +554,28 @@ def writeToExcelFile(suite, excelFileName):
     wb.save(excelFileName)
 
 if __name__ == '__main__':
+
+    #parse args
+    argHandler()
+
+    #virtual env installed libraries
+    try:
+        from openpyxl import Workbook
+        from selenium import webdriver as wd
+        from openpyxl.styles import colors
+        from openpyxl.styles import Color, PatternFill, Font, Border, NamedStyle
+        from openpyxl.styles import Alignment, Side
+        from openpyxl.formatting import Rule
+        from openpyxl.formatting.rule import CellIsRule
+        from openpyxl.utils import get_column_letter, rows_from_range
+        from openpyxl.utils import units
+    except ImportError:
+        print("Not in venv, starting new subprocess")
+        p = worker(sys.argv[1])
+        p.start()
+        sys.exit(0)
+
+    initStyles()
     checkCompat()
     scrapeInfo()
     writeToExcelFile(suite, reportFileName)
