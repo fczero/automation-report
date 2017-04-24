@@ -477,7 +477,7 @@ def writeToExcelFile(suite, excelFileName):
                     count = False
                 else:
                     ws.append(
-                        {Ò[MaÒ[MaÒ[MaÒ[MaÒ[MaÒFAIL_SC_COLS: feature['failures'][failure]['scenario'],
+                        {FAIL_SC_COLS: feature['failures'][failure]['scenario'],
                         FAIL_ST_COLS: feature['failures'][failure]['step']})
 
     #merging
