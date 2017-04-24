@@ -30,10 +30,11 @@ from pprint import pprint
 
 #Global Values
 LINE_WRAP_LENGTH    = 60
+HEADER_ROW          = 1
 DURATION_COL_LENGTH = 18
-DURATION_COL        = 5
-FAIL_SC_COLS        = 6
-FAIL_ST_COLS        = 7
+DURATION_COL        = 6
+FAIL_SC_COLS        = DURATION_COL + 1
+FAIL_ST_COLS        = FAIL_SC_COLS + 1
 automationReport    = ''
 reportFileName      = ''
 suite               = {}
@@ -51,6 +52,7 @@ def argHandler():
     global suite
     global devices
     global nodes
+    global reportFileName
     fName = os.path.basename(__file__)
 
     steps = """\nadditional notes:
@@ -90,6 +92,7 @@ def argHandler():
     elif args.both:
         processBoth()
     suite = {'nodes': [], 'duration': '', 'total': 0, 'failed': 0,
+             'skipped': 0,
              'name': automationReport}
     devices = ['Desktop', 'Tablet', 'Mobile']
 
@@ -198,7 +201,7 @@ def duration(string):
 def mergeCells(ws, cell, length):
     mergeStart = cell.row
     mergeEnd   = mergeStart + length
-    for col in range(1,6):
+    for col in range(1, DURATION_COL+1):
         ws.merge_cells(start_row = mergeStart,
                 start_column     = col,
                 end_row          = mergeEnd,
@@ -321,7 +324,7 @@ def scrapeInfo():
         for device in devices:
             newNode = {'name': 'Tags=Checkout_' + node + '_Responsive_' +
                        device, 'features': [], 'duration': '', 'total': 0,
-                       'failed': 0}
+                       'failed': 0, 'skipped': 0}
             suite['nodes'].append(newNode)
 
     driver=wd.Chrome()
@@ -347,6 +350,9 @@ def scrapeInfo():
             feature['duration'] = driver.find_element_by_id('stats-duration-' +
                                                             featureText).text
             featureElement.click()
+
+            #in feature page
+            #scraping failures
             failures = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='scenario-keyword']")
             feature['failed'] = len(failures)
             node['failed'] = node['failed'] + feature['failed']
@@ -371,7 +377,37 @@ def scrapeInfo():
                                                                   'step': steps[num].text}
                     count += 1
                 feature['failedSteps'].append(steps[num].text)
+
+            #scraping skipped
+            skips = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-keyword']")
+            feature['skipped'] = len(skips)
+            node['skipped'] += feature['skipped']
+            suite['skipped'] += feature['skipped']
+            scenarios = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
+            steps = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
+            feature['skipList'] = []
+            feature['skippedSteps'] = []
+            feature['skips'] = {}
+            count = 0
+            for num in range(len(skips)):
+                if skips[num].text == 'Background:':
+                    feature['skipList'].append(skips[num].text)
+                    feature['skips'][skips[num].text] = {'scenario': skips[num].text ,
+                                                               'step': steps[num].text}
+                else:
+                    feature['skipList'].append(skips[num].text +
+                                                  scenarios[count].text)
+                    feature['skips'][skips[num].text +
+                                        scenarios[count].text] = {'scenario': skips[num].text +
+                                                                  scenarios[count].text,
+                                                                  'step': steps[num].text}
+                    count += 1
+                feature['skippedSteps'].append(steps[num].text)
+
+
+            #add to scraped info to list
             features.append(feature)
+            #leaving feature page
             driver.back()
         node['features'] = features
         driver.back()
@@ -425,17 +461,19 @@ def writeToTextFile(suite, reportFileName):
     return
 
 
-def writeToExcelFile(suite, excelFileName):
-    excelFileName += '.xlsx'
+def writeToExcelFile(suite):
+    global reportFileName
+    reportFileName += '.xlsx'
     wb             = Workbook()
     ws             = wb.active
-    header         = ('Tests','Success Rate',"# Tests","# Failed", 'Duration',
-                      'Failed Scenarios','Failed Steps')
+    header         = ('Tests','Success Rate',"# Tests","# Failed","# Skipped",
+                      'Duration', 'Failed Scenarios','Failed Steps')
     ws.append(header)
     subHeader      = (suite['name'],
             str(round(100.0*(suite['total'] - suite['failed']) /
                       suite['total'],1)) + '%', str(suite['total']),
-            str(suite['failed']))
+            str(suite['failed']),
+            str(suite['skipped']))
     ws.append(subHeader)
 
     for node in suite['nodes']:
@@ -449,6 +487,7 @@ def writeToExcelFile(suite, excelFileName):
                 percent ,
                 str(node['total']),
                 str(node['failed']),
+                str(node['skipped']),
                 duration(node['duration']))
 
         ws.append(row)
@@ -460,9 +499,12 @@ def writeToExcelFile(suite, excelFileName):
                 percent = (str(round(100.0*(feature['total'] -
                                             feature['failed']) /
                                      feature['total'],1)) + '%')
-                row = (getFeatureFileName(feature['name']), percent,
-                        str(feature['total']), str(feature['failed']),
-                        duration(feature['duration']), '')
+                row = (getFeatureFileName(feature['name']),
+                       percent,
+                       str(feature['total']),
+                       str(feature['failed']),
+                       str(feature['skipped']),
+                       duration(feature['duration']), '')
                 ws.append(row)
 
             count = True
@@ -515,29 +557,30 @@ def writeToExcelFile(suite, excelFileName):
         for cell in row:
             cell.font = Font(color=colors.WHITE)
 
-    for row in ws['B:E']:
+    #style up to the duration column
+    for row in ws['B:F']:
         for cell in row:
             cell.alignment = centerAl
 
     #style the failed scenarios and failed steps columns
-    failedColumns = 'F4:G' + str(ws.max_row)
+    failedColumns = 'G4:H' + str(ws.max_row)
     for row in ws[failedColumns]:
         for cell in row:
             cell.alignment = failedStyle.alignment
 
     #set failed scenarios and failed steps column widths
-    ws.column_dimensions['F'].width = 60
     ws.column_dimensions['G'].width = 60
+    ws.column_dimensions['H'].width = 60
 
     #size all the columns
-    for  i in range(1, 6):
+    for  i in range(1, 7):
         resizeToFitColumn(ws, i)
 
     #resize duration column
-    resizeColumn(ws, 5, DURATION_COL_LENGTH)
+    resizeColumn(ws, DURATION_COL, DURATION_COL_LENGTH)
 
     #resize first row
-    resizeRow(ws, 1, 2)
+    resizeRow(ws, HEADER_ROW, 2)
 
     #resize rows with merged cells
     for row in ws.iter_rows(min_row=3, max_col=1, max_row=ws.max_row):
@@ -551,7 +594,7 @@ def writeToExcelFile(suite, excelFileName):
                 size   = 1 + (valueLength // LINE_WRAP_LENGTH)
                 resizeRow(ws, cell.row, size)
     #save file
-    wb.save(excelFileName)
+    wb.save(reportFileName)
 
 if __name__ == '__main__':
 
@@ -578,5 +621,7 @@ if __name__ == '__main__':
     initStyles()
     checkCompat()
     scrapeInfo()
-    writeToExcelFile(suite, reportFileName)
-    open_file(reportFileName + '.xlsx')
+    #debug info
+    pprint(suite)
+    writeToExcelFile(suite)
+    open_file(reportFileName)
