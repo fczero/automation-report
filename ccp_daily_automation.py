@@ -37,10 +37,6 @@ LINE_WRAP_LEN    = 60
 HEADER_ROW       = 1
 DURATION_COL_LEN = 18
 SKIPPED_COL_LEN  = 15
-##SKIPPED_COL      = 5
-#DURATION_COL     = SKIPPED_COL + 1
-#FAIL_SC_COLS     = DURATION_COL + 1
-#FAIL_ST_COLS     = FAIL_SC_COLS + 1
 automationReport = ''
 reportFileName   = ''
 suite            = {}
@@ -601,9 +597,6 @@ def writeToExcelFile(suite):
     for  i in range(1, COLS.index("DURATION")):
         resizeToFitColumn(ws, i)
 
-    #resize skipped steps column
-#    resizeColumn(ws, COLS.index("SKIPPED_NO"), SKIPPED_COL_LEN)
-
     #resize duration column
     resizeColumn(ws, COLS.index("DURATION"), DURATION_COL_LEN)
 
@@ -640,15 +633,15 @@ def buildJsonLinks():
 
 def getJsonFile(link):
     ''' returns python object '''
+    data = {}
     r = requests.get(link)
     if r.status_code != 200:
-        print("Error reading JSON on {} returned {}".format(link, r.status_code))
-        sys.exit(1)
+        print("Error reading JSON on {}, returned {}".format(link, r.status_code))
+#        sys.exit(1)
     try:
         data = r.json()
     except ValueError:
         print("Error reading JSON on {}, Jenkins test might be in progress".format(link))
-        data = {}
 #        sys.exit(1)
     return data
     
@@ -666,11 +659,6 @@ def scrapeSkippedFromJSON(data):
                 if skipScenarios:
                     out[suite['name']] = set(skipScenarios)
     return out
-
-#def scrapeSkipped():
-#    ''' returns list of list of scenarios with skips '''
-#    dataList = getJsonFiles()
-#    return [scrapeSkippedFromJSON(data) for data in dataList]
 
 def addSkipped(suite):
     for node in suite['nodes']:
