@@ -26,25 +26,42 @@ import os, sys, subprocess
 import multiprocessing as mp
 import venv
 import argparse
+from enum import Enum
 from pprint import pprint
 
 #Global Values
-LINE_WRAP_LENGTH    = 60
-HEADER_ROW          = 1
-DURATION_COL_LENGTH = 18
-DURATION_COL        = 6
-FAIL_SC_COLS        = DURATION_COL + 1
-FAIL_ST_COLS        = FAIL_SC_COLS + 1
-automationReport    = ''
-reportFileName      = ''
-suite               = {}
-devices             = []
-nodes               = []
-ENV_NAME            = 'myenv'
-ENV                 = os.path.join('.', ENV_NAME)
-BIN                 = os.path.join(ENV, 'bin')
-PIP                 = os.path.join(BIN,'pip')
-PY                  = os.path.join(BIN,'python3')
+#WIP
+BUILD_NO         = ''
+#WIP END
+LINE_WRAP_LEN    = 60
+HEADER_ROW       = 1
+DURATION_COL_LEN = 18
+SKIPPED_COL_LEN  = 15
+##SKIPPED_COL      = 5
+#DURATION_COL     = SKIPPED_COL + 1
+#FAIL_SC_COLS     = DURATION_COL + 1
+#FAIL_ST_COLS     = FAIL_SC_COLS + 1
+automationReport = ''
+reportFileName   = ''
+suite            = {}
+devices          = []
+nodes            = []
+ENV_NAME         = 'myenv'
+ENV              = os.path.join('.', ENV_NAME)
+BIN              = os.path.join(ENV, 'bin')
+PIP              = os.path.join(BIN,'pip')
+PY               = os.path.join(BIN,'python3')
+
+#1-based indexing
+COLS = ["",
+        "TEST_NAME",
+        "SUCCESS_RATE",
+        "TEST_NO",
+        "FAILED_NO",
+        "SKIPPED_NO",
+        "DURATION",
+        "FAILED_SCENARIOS",
+        "FAILED_STEPS"]
 
 #janky bootsrap helper funcs
 def argHandler():
@@ -101,6 +118,7 @@ def argHandler():
     if args.test:
         pprint(args)
         nodes = ['Confirmation']
+        devices = ['Desktop']
 
 def processBoth():
     procs = []
@@ -125,7 +143,7 @@ if not os.path.isdir(os.path.join('.', ENV)):
     subprocess.call([PIP, 'install', '--upgrade','pip'])
     subprocess.call([PIP, 'install', 'selenium'])
     subprocess.call([PIP, 'install', 'openpyxl'])
-
+    subprocess.call([PIP, 'install', 'requests'])
 
 def checkCompat():
     compatible = True
@@ -201,7 +219,7 @@ def duration(string):
 def mergeCells(ws, cell, length):
     mergeStart = cell.row
     mergeEnd   = mergeStart + length
-    for col in range(1, DURATION_COL+1):
+    for col in range(1, COLS.index("DURATION")+1):
         ws.merge_cells(start_row = mergeStart,
                 start_column     = col,
                 end_row          = mergeEnd,
@@ -294,7 +312,6 @@ def initStyles():
     defaultStyle.alignment = vertCenterAl
     defaultStyle.border    = thinBorder
 
-
     #blue highlight with white text style
     global blueHighlight
     blueHighlight           = NamedStyle(name="blueHighlight")
@@ -316,6 +333,11 @@ def initStyles():
     failedStyle            = NamedStyle(name="Failed")
     failedStyle.alignment = Alignment(vertical="center", wrap_text=True)
 
+    #skipped steps style
+    global skippedStyle
+    skippedStyle            = NamedStyle(name="Skipped")
+    skippedStyle.alignment  = Alignment(vertical="center", horizontal="center", wrap_text=True)
+
 def scrapeInfo():
     global suite
     global devices
@@ -326,7 +348,6 @@ def scrapeInfo():
                        device, 'features': [], 'duration': '', 'total': 0,
                        'failed': 0, 'skipped': 0}
             suite['nodes'].append(newNode)
-
     driver=wd.Chrome()
     driver.get("http://jenkins.ccp.tm.tmcs/view/RCO/")
     driver.find_element_by_link_text(suite['name']).click()
@@ -350,7 +371,6 @@ def scrapeInfo():
             feature['duration'] = driver.find_element_by_id('stats-duration-' +
                                                             featureText).text
             featureElement.click()
-
             #in feature page
             #scraping failures
             failures = driver.find_elements_by_xpath("//div[@class='failed']/span[@class='scenario-keyword']")
@@ -372,39 +392,37 @@ def scrapeInfo():
                     feature['failureList'].append(failures[num].text +
                                                   scenarios[count].text)
                     feature['failures'][failures[num].text +
-                                        scenarios[count].text] = {'scenario': failures[num].text +
-                                                                  scenarios[count].text,
+                                        scenarios[count].text] = {'scenario': ' '.join((failures[num].text + scenarios[count].text).split()),
                                                                   'step': steps[num].text}
                     count += 1
                 feature['failedSteps'].append(steps[num].text)
-
             #scraping skipped
             skips = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-keyword']")
             feature['skipped'] = len(skips)
             node['skipped'] += feature['skipped']
             suite['skipped'] += feature['skipped']
-            scenarios = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
-            steps = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
-            feature['skipList'] = []
-            feature['skippedSteps'] = []
-            feature['skips'] = {}
-            count = 0
-            for num in range(len(skips)):
-                if skips[num].text == 'Background:':
-                    feature['skipList'].append(skips[num].text)
-                    feature['skips'][skips[num].text] = {'scenario': skips[num].text ,
-                                                               'step': steps[num].text}
-                else:
-                    feature['skipList'].append(skips[num].text +
-                                                  scenarios[count].text)
-                    feature['skips'][skips[num].text +
-                                        scenarios[count].text] = {'scenario': skips[num].text +
-                                                                  scenarios[count].text,
-                                                                  'step': steps[num].text}
-                    count += 1
-                feature['skippedSteps'].append(steps[num].text)
-
-
+# WIP
+#            scenarios = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
+#            steps = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
+#            feature['skipList'] = []
+#            feature['skippedSteps'] = []
+#            feature['skips'] = {}
+#            count = 0
+#            for num in range(len(skips)):
+#                if skips[num].text == 'Background:':
+#                    feature['skipList'].append(skips[num].text)
+#                    feature['skips'][skips[num].text] = {'scenario': skips[num].text ,
+#                                                               'step': steps[num].text}
+#                else:
+#                    feature['skipList'].append(skips[num].text +
+#                                                  scenarios[count].text)
+#                    feature['skips'][skips[num].text +
+#                                        scenarios[count].text] = {'scenario': skips[num].text +
+#                                                                  scenarios[count].text,
+#                                                                  'step': steps[num].text}
+#                    count += 1
+#                feature['skippedSteps'].append(steps[num].text)
+# WIP end
             #add to scraped info to list
             features.append(feature)
             #leaving feature page
@@ -460,13 +478,12 @@ def writeToTextFile(suite, reportFileName):
     report.close()
     return
 
-
 def writeToExcelFile(suite):
     global reportFileName
     reportFileName += '.xlsx'
     wb             = Workbook()
     ws             = wb.active
-    header         = ('Tests','Success Rate',"# Tests","# Failed","# Skipped",
+    header         = ('Tests','Success Rate',"# Tests","# Failed","# Skipped steps",
                       'Duration', 'Failed Scenarios','Failed Steps')
     ws.append(header)
     subHeader      = (suite['name'],
@@ -511,16 +528,16 @@ def writeToExcelFile(suite):
             for failure in feature['failureList']:
                 if count:
                     ws.cell(row=ws.max_row,
-                            column=FAIL_SC_COLS,
+                            column=COLS.index("FAILED_SCENARIOS"),
                             value=feature['failures'][failure]['scenario'])
                     ws.cell(row=ws.max_row,
-                            column=FAIL_ST_COLS,
+                            column=COLS.index("FAILED_STEPS"),
                             value=feature['failures'][failure]['step'])
                     count = False
                 else:
                     ws.append(
-                        {FAIL_SC_COLS: feature['failures'][failure]['scenario'],
-                        FAIL_ST_COLS: feature['failures'][failure]['step']})
+                        {COLS.index("FAILED_SCENARIOS"): feature['failures'][failure]['scenario'],
+                        COLS.index("FAILED_STEPS"): feature['failures'][failure]['step']})
 
     #merging
     mergeSheet(ws)
@@ -562,7 +579,15 @@ def writeToExcelFile(suite):
         for cell in row:
             cell.alignment = centerAl
 
+    #style the skipped steps
+    #'E'
+    loc = get_column_letter(COLS.index("SKIPPED_NO"))
+    for row in ws[loc + '1:' + loc + str(ws.max_row)]:
+        for cell in row:
+            cell.alignment = skippedStyle.alignment
+
     #style the failed scenarios and failed steps columns
+    #'G4:H'
     failedColumns = 'G4:H' + str(ws.max_row)
     for row in ws[failedColumns]:
         for cell in row:
@@ -573,11 +598,14 @@ def writeToExcelFile(suite):
     ws.column_dimensions['H'].width = 60
 
     #size all the columns
-    for  i in range(1, 7):
+    for  i in range(1, COLS.index("DURATION")):
         resizeToFitColumn(ws, i)
 
+    #resize skipped steps column
+#    resizeColumn(ws, COLS.index("SKIPPED_NO"), SKIPPED_COL_LEN)
+
     #resize duration column
-    resizeColumn(ws, DURATION_COL, DURATION_COL_LENGTH)
+    resizeColumn(ws, COLS.index("DURATION"), DURATION_COL_LEN)
 
     #resize first row
     resizeRow(ws, HEADER_ROW, 2)
@@ -585,16 +613,84 @@ def writeToExcelFile(suite):
     #resize rows with merged cells
     for row in ws.iter_rows(min_row=3, max_col=1, max_row=ws.max_row):
         for cell in row:
-            failedScenarioCell = cell.offset(column=FAIL_SC_COLS-1)
-            failedStepCell = cell.offset(column=FAIL_ST_COLS-1)
+            failedScenarioCell = cell.offset(column=COLS.index("FAILED_SCENARIOS")-1)
+            failedStepCell = cell.offset(column=COLS.index("FAILED_STEPS")-1)
             valueLength = max(map(len,
                                   map(str,(failedScenarioCell.value,
                                            failedStepCell.value))))
             if(failedScenarioCell.value):
-                size   = 1 + (valueLength // LINE_WRAP_LENGTH)
+                size   = 1 + (valueLength // LINE_WRAP_LEN)
                 resizeRow(ws, cell.row, size)
     #save file
     wb.save(reportFileName)
+
+def urlBuilderFromNode(node):
+    ''' returns url '''
+    global automationReport
+    smoke    = 'RCO_Full_Smoke'
+    regg     = 'RCO_Full_Regression'
+    prefix   = 'http://jenkins.ccp.tm.tmcs/view/RCO/job/'
+    type = smoke if 'Smoke' in automationReport else regg
+    mid   = '/Browser=chrome,Domain=US,'
+    suffix = ',jdk=JDK8u60,restricted_executors=rco/ws/target/cucumber-integration-json-report.json'
+    return prefix + type + mid + node + suffix
+
+def buildJsonLinks():
+    return [urlBuilder(x, y) for x in nodes for y in devices]
+
+def getJsonFile(link):
+    ''' returns python object '''
+    r = requests.get(link)
+    if r.status_code != 200:
+        print("Error reading JSON on {} returned {}".format(link, r.status_code))
+        sys.exit(1)
+    try:
+        data = r.json()
+    except ValueError:
+        print("Error reading JSON on {}, Jenkins test might be in progress".format(link))
+        data = {}
+#        sys.exit(1)
+    return data
+    
+def scrapeSkippedFromJSON(data):
+    ''' returns dictionary of unique scenarios with skips '''
+    out = {}
+    for suite in data:
+        if 'elements' in suite:
+            skipScenarios = []
+            for element in suite['elements']:
+                for step in element['steps']:
+                    if step['result']['status'] == 'skipped':
+                        if element['name']:
+                            skipScenarios.append(element['name'])
+                if skipScenarios:
+                    out[suite['name']] = set(skipScenarios)
+    return out
+
+#def scrapeSkipped():
+#    ''' returns list of list of scenarios with skips '''
+#    dataList = getJsonFiles()
+#    return [scrapeSkippedFromJSON(data) for data in dataList]
+
+def addSkipped(suite):
+    for node in suite['nodes']:
+        link = urlBuilderFromNode(node['name'])
+        table = scrapeSkippedFromJSON(getJsonFile(link))
+        for feature in node['features']:
+            if feature['name'] in table:
+                #step thru every scenario that skipped
+                for scenario in table[feature['name']]:
+                    scenarioWithPrefix = ' '.join(('Scenario:'+scenario).split())
+                    if not scenarioWithPrefix in feature['failureList']:
+                        feature['failureList'].append(scenarioWithPrefix)
+                        feature['failures'][scenarioWithPrefix] = {'scenario': scenarioWithPrefix,
+                                                                   'step'    : 'has skipped steps'}
+                        feature['failedSteps'].append('has skipped steps')
+                        feature['failed'] += 1
+
+def enum(*sequential, **named):
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
 
 if __name__ == '__main__':
 
@@ -604,7 +700,6 @@ if __name__ == '__main__':
     #virtual env installed libraries
     try:
         from openpyxl import Workbook
-        from selenium import webdriver as wd
         from openpyxl.styles import colors
         from openpyxl.styles import Color, PatternFill, Font, Border, NamedStyle
         from openpyxl.styles import Alignment, Side
@@ -612,16 +707,19 @@ if __name__ == '__main__':
         from openpyxl.formatting.rule import CellIsRule
         from openpyxl.utils import get_column_letter, rows_from_range
         from openpyxl.utils import units
+        from selenium import webdriver as wd
     except ImportError:
         print("Not in venv, starting new subprocess call")
         p = worker(sys.argv[1])
         p.start()
         sys.exit(0)
 
+    import json
+    import requests
+
     initStyles()
     checkCompat()
     scrapeInfo()
-    #debug info
-    pprint(suite)
+    addSkipped(suite)
     writeToExcelFile(suite)
     open_file(reportFileName)
