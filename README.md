@@ -8,16 +8,15 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-What things you need to install the software and how to install them
-
 ```
-python 3.4+
+python 3.5+
 python 3-venv
 Must be connected to VPN
 no myenv folder when initially run
 ```
 
 ### Usage
+
 ```sh
 $python3 ccp_daily_automation.py [-h] [-s | -r | -t]
 optional arguments:
@@ -26,12 +25,12 @@ optional arguments:
          -r, --regression  Generate Regression Report
          -t, --test        Test mode, Smoke Confirmation only
 ```
+
 ## Built With
 
 * Python3
 * OpenPyXL
 * Requests
-
 
 ## Versioning
 
