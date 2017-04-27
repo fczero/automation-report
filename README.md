@@ -40,7 +40,8 @@ These instructions will get you a copy of the project up and running on your loc
 What things you need to install the software and how to install them
 
 ```
-Give examples
+python 3.4+
+python 3-venv
 ```
 
 ### Installing
@@ -83,11 +84,14 @@ Give an example
 
 ## Deployment
 
-Add additional notes about how to deploy this on a live system
+Must be connected to VPN when run.
 
 ## Built With
 
 * Python3
+* OpenPyXl
+* Requests
+
 
 ## Versioning
 
