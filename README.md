@@ -19,22 +19,13 @@ no myenv folder when initially run
 
 ### Usage
 ```
-     usage: ccp_daily_automation.py [-h] [-s | -r | -t]
-
-     Scrape Jenkins report and create XLSX report.
-
-     optional arguments:
+ccp_daily_automation.py [-h] [-s | -r | -t]
+optional arguments:
          -h, --help        show this help message and exit
          -s, --smoke       Generate Smoke Report
          -r, --regression  Generate Regression Report
-         -t, --test        Test mode, Smoke Confirmation
+         -t, --test        Test mode, Smoke Confirmation only
 ```
-
-
-## Deployment
-
-Must be connected to VPN when run.
-
 ## Built With
 
 * Python3
