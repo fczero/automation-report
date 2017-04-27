@@ -18,8 +18,8 @@ no myenv folder when initially run
 ```
 
 ### Usage
-```
-ccp_daily_automation.py [-h] [-s | -r | -t]
+```sh
+$python3 ccp_daily_automation.py [-h] [-s | -r | -t]
 optional arguments:
          -h, --help        show this help message and exit
          -s, --smoke       Generate Smoke Report
