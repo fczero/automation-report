@@ -89,7 +89,7 @@ Must be connected to VPN when run.
 ## Built With
 
 * Python3
-* OpenPyXl
+* OpenPyXL
 * Requests
 
 
