@@ -51,7 +51,7 @@ A step by step series of examples that tell you have to get a development env ru
 Say what the step will be
 
 ```sh
-python3 ccp_daily_automation.py
+$python3 ccp_daily_automation.py
 ```
 
 And repeat
