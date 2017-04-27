@@ -44,14 +44,14 @@ python 3.4+
 python 3-venv
 ```
 
-### Installing
+### Usage
 
 A step by step series of examples that tell you have to get a development env running
 
 Say what the step will be
 
-```
-Give the example
+```sh
+python3 ccp_daily_automation.py
 ```
 
 And repeat
@@ -60,27 +60,6 @@ And repeat
 until finished
 ```
 
-End with an example of getting some data out of the system or using it for a little demo
-
-## Running the tests
-
-Explain how to run the automated tests for this system
-
-### Break down into end to end tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
-
-### And coding style tests
-
-Explain what these tests test and why
-
-```
-Give an example
-```
 
 ## Deployment
 
