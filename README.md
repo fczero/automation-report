@@ -13,18 +13,7 @@ chmod 775 ccp_daily_automation.py
  3       Run using $./ccp_daily_automation.py
    OR
  2.b     Run using $python3 ccp_daily_automation.py
- ```
-    Help
-     usage: ccp_daily_automation.py [-h] [-s | -r | -t]
-
-     Scrape Jenkins report and create XLSX report.
-
-     optional arguments:
-         -h, --help        show this help message and exit
-         -s, --smoke       Generate Smoke Report
-         -r, --regression  Generate Regression Report
-         -t, --test        Test mode, Smoke Confirmation
-```
+ 
 
 
 # automation-report
@@ -42,22 +31,21 @@ What things you need to install the software and how to install them
 ```
 python 3.4+
 python 3-venv
+Must be connected to VPN
+no myenv folder when initially run
 ```
 
 ### Usage
-
-A step by step series of examples that tell you have to get a development env running
-
-Say what the step will be
-
-```sh
-$python3 ccp_daily_automation.py
 ```
+     usage: ccp_daily_automation.py [-h] [-s | -r | -t]
 
-And repeat
+     Scrape Jenkins report and create XLSX report.
 
-```
-until finished
+     optional arguments:
+         -h, --help        show this help message and exit
+         -s, --smoke       Generate Smoke Report
+         -r, --regression  Generate Regression Report
+         -t, --test        Test mode, Smoke Confirmation
 ```
 
 
