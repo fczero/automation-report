@@ -44,10 +44,6 @@ suite            = {}
 devices          = []
 nodes            = []
 ENV_NAME         = 'myenv'
-ENV              = os.path.join('.', ENV_NAME)
-BIN              = os.path.join(ENV, 'bin')
-PIP              = os.path.join(BIN,'pip')
-PY               = os.path.join(BIN,'python3')
 
 #1-based indexing
 COLS = ["",
@@ -134,6 +130,22 @@ def worker(tag):
     fileName = os.path.basename(__file__)
     return mp.Process(target=subprocess.call, args=([PY, fileName, tag],))
 
+def build_paths():
+    global ENV_NAME
+    global ENV
+    global BIN
+    global PIP
+    global PY
+
+    ENV = os.path.join('.', ENV_NAME)
+    if sys.platform == "win32":
+        BIN = os.path.join(ENV, 'Scripts')
+    else:
+        BIN = os.path.join(ENV, 'bin')
+    PIP = os.path.join(BIN,'pip')
+    PY  = os.path.join(BIN,'python3')
+
+build_paths()
 #janky bootsrap implementation
 if not os.path.isdir(os.path.join('.', ENV)):
     #create virtual environment
