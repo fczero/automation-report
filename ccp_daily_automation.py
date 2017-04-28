@@ -1,38 +1,39 @@
 #!/usr/bin/env python3
 
-##==============================================================================
-##      The report will be saved as an XLSX in the same directory.
-##
-##      1.      Login to the VPN
-##      2.a     Add executable permission using chmod
-##              Ex. $chmod 775 ccp_daily_automation.py
-##      3       Run using $./ccp_daily_automation.py
-##        OR
-##      2.b     Run using $python3 ccp_daily_automation.py
-##         Help
-##          usage: ccp_daily_automation.py [-h] [-s | -r | -t]
-##          
-##          Scrape Jenkins report and create XLSX report.
-##          
-##          optional arguments:
-##              -h, --help        show this help message and exit
-##              -s, --smoke       Generate Smoke Report
-##              -r, --regression  Generate Regression Report
-##              -t, --test        Test mode, Smoke Confirmation
-##
-##==============================================================================
+# #==============================================================================
+# #      The report will be saved as an XLSX in the same directory.
+# #
+# #      1.      Login to the VPN
+# #      2.a     Add executable permission using chmod
+# #              Ex. $chmod 775 ccp_daily_automation.py
+# #      3       Run using $./ccp_daily_automation.py
+# #        OR
+# #      2.b     Run using $python3 ccp_daily_automation.py
+# #         Help
+# #          usage: ccp_daily_automation.py [-h] [-s | -r | -t]
+# #
+# #          Scrape Jenkins report and create XLSX report.
+# #
+# #          optional arguments:
+# #              -h, --help        show this help message and exit
+# #              -s, --smoke       Generate Smoke Report
+# #              -r, --regression  Generate Regression Report
+# #              -t, --test        Test mode, Smoke Confirmation
+# #
+# #==============================================================================
 
-import os, sys, subprocess
+import os
+import sys
+import subprocess
 import multiprocessing as mp
 import venv
 import argparse
-from enum import Enum
 from pprint import pprint
 
-#Global Values
-#WIP
+# Global Values
+# WIP
 BUILD_NO         = ''
-#WIP END
+# WIP END
 LINE_WRAP_LEN    = 60
 HEADER_ROW       = 1
 DURATION_COL_LEN = 18
@@ -59,8 +60,9 @@ COLS = ["",
         "FAILED_SCENARIOS",
         "FAILED_STEPS"]
 
-#janky bootsrap helper funcs
-def argHandler():
+
+# janky bootsrap helper funcs
+def arghandler():
     global automationReport
     global suite
     global devices
@@ -82,13 +84,13 @@ def argHandler():
     parser = argparse.ArgumentParser(description=desc)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-s', '--smoke', help="Generate Smoke Report",
-                        action="store_true")
-    group.add_argument('-r','--regression', help="Generate Regression Report",
-                        action="store_true")
+                       action="store_true")
+    group.add_argument('-r', '--regression', help="Generate Regression Report",
+                       action="store_true")
     group.add_argument('-t', '--test', help="Test mode, runs the smallest suite",
-                        action="store_true")
+                       action="store_true")
     group.add_argument('-b', '--both', help="Generate both smoke and regression reports",
-                        action="store_true")
+                       action="store_true")
     args = parser.parse_args()
 
     if len(sys.argv) == 1:
@@ -113,7 +115,7 @@ def argHandler():
              'Review']
     if args.test:
         pprint(args)
-        nodes = ['Confirmation']
+        nodes = ['Delivery']
         devices = ['Desktop']
 
 def processBoth():
@@ -628,9 +630,6 @@ def urlBuilderFromNode(node):
     suffix = ',jdk=JDK8u60,restricted_executors=rco/ws/target/cucumber-integration-json-report.json'
     return prefix + type + mid + node + suffix
 
-def buildJsonLinks():
-    return [urlBuilder(x, y) for x in nodes for y in devices]
-
 def getJsonFile(link):
     ''' returns python object '''
     data = {}
@@ -644,7 +643,8 @@ def getJsonFile(link):
         print("Error reading JSON on {}, Jenkins test might be in progress".format(link))
 #        sys.exit(1)
     return data
-    
+
+
 def scrapeSkippedFromJSON(data):
     ''' returns dictionary of unique scenarios with skips '''
     out = {}
@@ -660,13 +660,14 @@ def scrapeSkippedFromJSON(data):
                     out[suite['name']] = set(skipScenarios)
     return out
 
+
 def addSkipped(suite):
     for node in suite['nodes']:
         link = urlBuilderFromNode(node['name'])
         table = scrapeSkippedFromJSON(getJsonFile(link))
         for feature in node['features']:
             if feature['name'] in table:
-                #step thru every scenario that skipped
+                # step thru every scenario that skipped
                 for scenario in table[feature['name']]:
                     scenarioWithPrefix = ' '.join(('Scenario:'+scenario).split())
                     if not scenarioWithPrefix in feature['failureList']:
@@ -676,16 +677,13 @@ def addSkipped(suite):
                         feature['failedSteps'].append('has skipped steps')
                         feature['failed'] += 1
 
-def enum(*sequential, **named):
-    enums = dict(zip(sequential, range(len(sequential))), **named)
-    return type('Enum', (), enums)
 
 if __name__ == '__main__':
 
-    #parse args
-    argHandler()
+    # parse args
+    arghandler()
 
-    #virtual env installed libraries
+    # virtual env installed libraries
     try:
         from openpyxl import Workbook
         from openpyxl.styles import colors
