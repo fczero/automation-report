@@ -1,6 +1,6 @@
 # automation-report
 
-Jenkins Cucumber Report scraper and creates an XLSX file.
+Jenkins Cucumber Report scraper to XLSX.
 
 ## Getting Started
 
