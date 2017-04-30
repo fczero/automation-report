@@ -39,7 +39,7 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 ## Authors
 
 * **Russell Delogu** - *Initial work*
-* **Francis Lagadia** - *XLSX output*
+* **Francis Lagadia** - *XLSX output, maintenance*
 
 See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
 
