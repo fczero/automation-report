@@ -23,7 +23,7 @@ optional arguments:
          -h, --help        show this help message and exit
          -s, --smoke       Generate Smoke Report
          -r, --regression  Generate Regression Report
-         -t, --test        Test mode, Smoke Confirmation only
+         -t, --test        Test mode
 ```
 
 ## Built With
