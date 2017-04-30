@@ -7,13 +7,10 @@ Jenkins Cucumber Report scraper to XLSX.
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
 ### Prerequisites
-
-```
-python 3.5+
-python 3-venv
-Must be connected to VPN
-there should be no myenv folder on the script directory when running for the first time
-```
+1. python 3.5+
+1. python 3-venv
+1. Must be connected to VPN
+1. there should be no *myenv* folder on the script directory when running for the first time
 
 ### Usage
 
