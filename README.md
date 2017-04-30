@@ -12,7 +12,7 @@ These instructions will get you a copy of the project up and running on your loc
 python 3.5+
 python 3-venv
 Must be connected to VPN
-there should be no myenv folder on the script directory on first run
+there should be no myenv folder on the script directory when running for the first time
 ```
 
 ### Usage
