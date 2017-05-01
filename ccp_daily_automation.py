@@ -34,10 +34,10 @@ from pprint import pprint
 # WIP
 BUILD_NO         = ''
 # WIP END
-LINE_WRAP_LEN    = 60
 HEADER_ROW       = 1
+LINE_WRAP_LEN    = 60
 DURATION_COL_LEN = 18
-SKIPPED_COL_LEN  = 15
+MAN_TEST_COL_LEN = 18
 automationReport = ''
 reportFileName   = ''
 suite            = {}
@@ -51,10 +51,11 @@ COLS = ["",
         "SUCCESS_RATE",
         "TEST_NO",
         "FAILED_NO",
-        "SKIPPED_NO",
         "DURATION",
         "FAILED_SCENARIOS",
-        "FAILED_STEPS"]
+        "FAILED_STEPS",
+        "SKIPPED_SCENARIOS",
+        "MANUAL_TEST"]
 
 
 # janky bootsrap helper funcs
@@ -103,7 +104,6 @@ def arghandler():
     elif args.both:
         processBoth()
     suite = {'nodes': [], 'duration': '', 'total': 0, 'failed': 0,
-             'skipped': 0,
              'name': automationReport}
     devices = ['Desktop', 'Tablet', 'Mobile']
 
@@ -111,7 +111,7 @@ def arghandler():
              'Review']
     if args.test:
         pprint(args)
-        nodes = ['Delivery']
+        nodes = ['Authentication']
         devices = ['Desktop']
 
 def processBoth():
@@ -143,27 +143,37 @@ def build_paths():
     else:
         BIN = os.path.join(ENV, 'bin')
     PIP = os.path.join(BIN,'pip')
-    PY  = os.path.join(BIN,'python3')
+    if sys.platform == "win32":
+        PY  = os.path.join(BIN,'python')
+    else:
+        PY  = os.path.join(BIN,'python3')
 
 build_paths()
 #janky bootsrap implementation
 if not os.path.isdir(os.path.join('.', ENV)):
     #create virtual environment
     venv.create(ENV, with_pip=True)
-    subprocess.call([PIP, 'install', '--upgrade','pip'])
-    subprocess.call([PIP, 'install', 'selenium'])
-    subprocess.call([PIP, 'install', 'openpyxl'])
-    subprocess.call([PIP, 'install', 'requests'])
+    if sys.platform != "win32":
+        subprocess.call([PIP, 'install', '--upgrade','pip'])
+        subprocess.call([PIP, 'install', 'selenium'])
+        subprocess.call([PIP, 'install', 'openpyxl'])
+        subprocess.call([PIP, 'install', 'requests'])
+    else:
+        subprocess.call([PIP, 'install', '--upgrade','pip'], shell=True)
+        subprocess.call([PIP, 'install', 'selenium'], shell=True)
+        subprocess.call([PIP, 'install', 'openpyxl'], shell=True)
+        subprocess.call([PIP, 'install', 'requests'], shell=True)
+
 
 def checkCompat():
     compatible = True
-    if sys.version_info < (3, 5):
+    if sys.version_info < (3, 4):
         compatible = False
     elif not hasattr(sys, 'base_prefix'):
         compatible = False
     if not compatible:
         raise ValueError('This script is only for use with '
-                         'Python 3.5 or later')
+                         'Python 3.4 or later')
 
 def open_file(filename):
     if sys.platform == "win32":
@@ -238,23 +248,31 @@ def mergeCells(ws, cell, length):
 def mergeSheet(ws):
     mergeLen   = 0
     newGroup   = False
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=1):
+    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, max_col=1):
         for cell in row:
-            if cell.value and not newGroup:
-                start = cell
-            elif cell.value and newGroup:
-                mergeCells(ws, start, mergeLen)
-                mergeLen = 0
-                start    = cell
-                newGroup = False
-            elif not cell.value:
+            addFailedCellFormula(cell)
+            if cell.value:
+                if not newGroup:
+                    start = cell
+                    # overwrite failed cell formula
+                    addFailedCellFormula(start)
+                else:
+                    # overwrite failed cell formula
+                    addFailedCellFormula(start, mergeLen)
+                    mergeCells(ws, start, mergeLen)
+                    mergeLen = 0
+                    start    = cell
+                    newGroup = False
+            else:
                 if cell.row < ws.max_row:
                     mergeLen += 1
                     newGroup  = True
                 else:
+                    # overwrite failed cell formula
+                    addFailedCellFormula(start, mergeLen)
                     mergeCells(ws, start, mergeLen + 1)
 
-def takeAllSuites(ws):
+def getAllSuites(ws):
     return [cell for row in ws.iter_rows(min_row=1,
                                          max_row=ws.max_row,
                                          max_col=1)
@@ -299,6 +317,13 @@ def initStyles():
                             end_color = colors.GREEN,
                             fill_type = 'solid')
 
+    #Cyan Fill
+    global cyanFill
+    cyan = "FF00FFFF"
+    cyanFill = PatternFill(start_color = cyan,
+                            end_color = cyan,
+                            fill_type = 'solid')
+
     #vertical alignment centered 
     global verCenterAl
     vertCenterAl =  Alignment(vertical="center")
@@ -330,6 +355,13 @@ def initStyles():
     blueHighlight.border    = thinBorder
     blueHighlight.fill      = blueFill
 
+    #cyan highlight with white text style
+    global cyanHighlight
+    cyanHighlight           = NamedStyle(name="cyanHighlight")
+    cyanHighlight.alignment = centerAl
+    cyanHighlight.border    = thinBorder
+    cyanHighlight.fill      = cyanFill
+
     #suite header style
     global suiteStyle
     suiteStyle            = NamedStyle(name="Suite")
@@ -348,6 +380,11 @@ def initStyles():
     skippedStyle            = NamedStyle(name="Skipped")
     skippedStyle.alignment  = Alignment(vertical="center", horizontal="center", wrap_text=True)
 
+    # data validation for manual testing column
+    global manualTestingDv
+    manualTestingDv = DataValidation(type="list", formula1='"PASSED,FAILED"', allow_blank=True)
+    
+
 def scrapeInfo():
     global suite
     global devices
@@ -356,7 +393,7 @@ def scrapeInfo():
         for device in devices:
             newNode = {'name': 'Tags=Checkout_' + node + '_Responsive_' +
                        device, 'features': [], 'duration': '', 'total': 0,
-                       'failed': 0, 'skipped': 0}
+                       'failed': 0}
             suite['nodes'].append(newNode)
     driver=wd.Chrome()
     driver.get("http://jenkins.ccp.tm.tmcs/view/RCO/")
@@ -406,11 +443,13 @@ def scrapeInfo():
                                                                   'step': steps[num].text}
                     count += 1
                 feature['failedSteps'].append(steps[num].text)
+
+            feature['skipList'] = []
             #scraping skipped
-            skips = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-keyword']")
-            feature['skipped'] = len(skips)
-            node['skipped'] += feature['skipped']
-            suite['skipped'] += feature['skipped']
+#            skips = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-keyword']")
+#            feature['skipped'] = len(skips)
+#            node['skipped'] += feature['skipped']
+#            suite['skipped'] += feature['skipped']
 # WIP
 #            scenarios = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
 #            steps = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
@@ -493,44 +532,38 @@ def writeToExcelFile(suite):
     reportFileName += '.xlsx'
     wb             = Workbook()
     ws             = wb.active
-    header         = ('Tests','Success Rate',"# Tests","# Failed","# Skipped steps",
-                      'Duration', 'Failed Scenarios','Failed Steps')
+    header         = ('Tests',
+                      'Success Rate',
+                      "# Tests",
+                      "# Failed",
+                      'Duration',
+                      'Failed Scenarios',
+                      'Failed Steps',
+                      'Skipped Steps',
+                      'Manual Testing')
     ws.append(header)
-    subHeader      = (suite['name'],
-            str(round(100.0*(suite['total'] - suite['failed']) /
-                      suite['total'],1)) + '%', str(suite['total']),
-            str(suite['failed']),
-            str(suite['skipped']))
+    subHeader      = (suite['name'],"")
     ws.append(subHeader)
 
     for node in suite['nodes']:
-        if node['total'] == 0:
-            percent = 'No Tests'
-        else:
-            percent = str(round(100.0*(node['total'] - node['failed']) /
-                                node['total'],1)) + '%'
-
+        percent=''
         row = ("Suite:  " + node['name'][5:],
-                percent ,
-                str(node['total']),
-                str(node['failed']),
-                str(node['skipped']),
-                duration(node['duration']))
+               percent,
+               '',               
+               '',
+               duration(node['duration']))
 
         ws.append(row)
 
         for feature in node['features']:
+            percent = ''
             if feature['total'] == 0:
-                percent = 'No Tests'
+                pass
             else:
-                percent = (str(round(100.0*(feature['total'] -
-                                            feature['failed']) /
-                                     feature['total'],1)) + '%')
                 row = (getFeatureFileName(feature['name']),
-                       percent,
-                       str(feature['total']),
-                       str(feature['failed']),
-                       str(feature['skipped']),
+                       '',
+                       feature['total'],
+                       '',
                        duration(feature['duration']), '')
                 ws.append(row)
 
@@ -539,16 +572,24 @@ def writeToExcelFile(suite):
                 if count:
                     ws.cell(row=ws.max_row,
                             column=COLS.index("FAILED_SCENARIOS"),
-                            value=feature['failures'][failure]['scenario'])
+                            value=feature['failures'][failure]['scenario'][9:])
                     ws.cell(row=ws.max_row,
                             column=COLS.index("FAILED_STEPS"),
                             value=feature['failures'][failure]['step'])
                     count = False
                 else:
                     ws.append(
-                        {COLS.index("FAILED_SCENARIOS"): feature['failures'][failure]['scenario'],
+                        {COLS.index("FAILED_SCENARIOS"): feature['failures'][failure]['scenario'][9:],
                         COLS.index("FAILED_STEPS"): feature['failures'][failure]['step']})
 
+            for skip in feature['skipList']:
+                if count:
+                    ws.cell(row=ws.max_row,
+                            column=COLS.index("SKIPPED_SCENARIOS"),
+                            value=skip)
+                    count = False
+                else:
+                    ws.append({COLS.index("SKIPPED_SCENARIOS"): skip})
     #merging
     mergeSheet(ws)
 
@@ -558,52 +599,72 @@ def writeToExcelFile(suite):
         for cell in row:
             cell.style = defaultStyle
 
-    #first 3 rows
-    for row in ws.iter_rows(min_row=1, max_col=ws.max_column, max_row=3):
+    #first 2 rows
+    for row in ws.iter_rows(min_row=1, max_col=ws.max_column, max_row=2):
         for cell in row:
             cell.style = blueHighlight
 
+    #skipped steps rows
+    for row in ws.iter_rows(min_row=1, min_col=COLS.index("SKIPPED_SCENARIOS"),
+                            max_col=COLS.index("SKIPPED_SCENARIOS"), max_row=2):
+        for cell in row:
+            cell.style = cyanHighlight
+
     #test suite rows
-    suiteCells = takeAllSuites(ws)
+    suiteCells = getAllSuites(ws)
     for suiteCell in suiteCells:
         for col in ws.iter_cols(min_row = suiteCell.row,
                                 max_col = ws.max_column,
                                 max_row = suiteCell.row):
             for cell in col:
-                cell.style = suiteStyle
+                if cell.col_idx == COLS.index("SKIPPED_SCENARIOS"):
+                    cell.style = cyanHighlight
+                else:
+                    cell.style = suiteStyle
                 resizeRow(ws, cell.row, 2)
 
     #style the rate column
     rateColumn = 'B2:B' + str(ws.max_row)
     ws.conditional_formatting.add(rateColumn,
-            CellIsRule(operator='==', formula=['"100.0%"'], fill=greenFill))
+            CellIsRule(operator='==', formula=['1'], fill=greenFill, font=Font(color=colors.BLACK)))
     ws.conditional_formatting.add(rateColumn,
-            CellIsRule(operator='!=', formula=['"100.0%"'], fill=redFill))
+            CellIsRule(operator='!=', formula=['1'], fill=redFill, font=Font(color=colors.WHITE)))
 
     for row in ws[rateColumn]:
         for cell in row:
-            cell.font = Font(color=colors.WHITE)
+#            cell.font = Font(color=colors.WHITE)
+            cell.number_format ='0.00%'
 
     #style up to the duration column
     for row in ws['B:F']:
         for cell in row:
             cell.alignment = centerAl
 
-    #style the skipped steps
-    #'E'
-    loc = get_column_letter(COLS.index("SKIPPED_NO"))
+    #style the skipped scenarios
+    loc = get_column_letter(COLS.index("SKIPPED_SCENARIOS"))
     for row in ws[loc + '1:' + loc + str(ws.max_row)]:
         for cell in row:
             cell.alignment = skippedStyle.alignment
 
-    #style the failed scenarios and failed steps columns
-    #'G4:H'
-    failedColumns = 'G4:H' + str(ws.max_row)
+    # style the failed scenarios and failed steps columns
+    # TODO 'F4:H' to  relative pos
+    failedColumns = 'F4:H' + str(ws.max_row)
     for row in ws[failedColumns]:
         for cell in row:
             cell.alignment = failedStyle.alignment
 
-    #set failed scenarios and failed steps column widths
+    # style the manual testing column
+    manualTestColumn = 'I2:I' + str(ws.max_row)
+    for row in ws[manualTestColumn]:
+        for cell in row:
+            cell.alignment = centerAl
+    ws.conditional_formatting.add(manualTestColumn,
+            CellIsRule(operator='==', formula=['"PASSED"'], fill=greenFill, font=Font(color=colors.BLACK)))
+    ws.conditional_formatting.add(manualTestColumn,
+            CellIsRule(operator='==', formula=['"FAILED"'], fill=redFill, font=Font(color=colors.WHITE)))
+
+    #set fixed widths
+    ws.column_dimensions['F'].width = 60
     ws.column_dimensions['G'].width = 60
     ws.column_dimensions['H'].width = 60
 
@@ -614,6 +675,9 @@ def writeToExcelFile(suite):
     #resize duration column
     resizeColumn(ws, COLS.index("DURATION"), DURATION_COL_LEN)
 
+    #resize manual testing column
+    resizeColumn(ws, COLS.index("MANUAL_TEST"), MAN_TEST_COL_LEN)
+
     #resize first row
     resizeRow(ws, HEADER_ROW, 2)
 
@@ -622,12 +686,98 @@ def writeToExcelFile(suite):
         for cell in row:
             failedScenarioCell = cell.offset(column=COLS.index("FAILED_SCENARIOS")-1)
             failedStepCell = cell.offset(column=COLS.index("FAILED_STEPS")-1)
+            skippedScenarioCell = cell.offset(column=COLS.index("SKIPPED_SCENARIOS")-1)
             valueLength = max(map(len,
                                   map(str,(failedScenarioCell.value,
-                                           failedStepCell.value))))
-            if(failedScenarioCell.value):
+                                           failedStepCell.value,
+                                           skippedScenarioCell.value))))
+            if(failedScenarioCell.value or skippedScenarioCell.value):
                 size   = 1 + (valueLength // LINE_WRAP_LEN)
                 resizeRow(ws, cell.row, size)
+
+
+    # add Success rate formula to suites and features
+    for row in ws.iter_rows(min_row=2, min_col=2, max_col=2, max_row=ws.max_row):
+        for cell in row:
+            tot = cell.offset(column=1)
+            ng = cell.offset(column=2)
+            cell.value = '=IF({0}=0,0,({0}-{1})/{0})'.format(tot.coordinate, ng.coordinate)
+
+    # add # of tests formula
+    # refactor to a function
+    for row in ws.iter_rows(min_row=3,
+                            min_col=COLS.index("TEST_NO"),
+                            max_col=COLS.index("TEST_NO"),
+                            max_row=ws.max_row):
+        for cell in row:
+            leadCell = cell.offset(column=-2)
+            if leadCell in suiteCells:
+                suiteLength = getSuiteRowLen(leadCell, ws)
+                offset = 0 if not suiteLength else 1
+                if suiteLength:
+                    cell.value = "=SUM({0}{1}:{0}{2})".format(cell.column,
+                                                           str(cell.row+offset),
+                                                           str(cell.row+suiteLength))
+                else:
+                    cell.value = 0
+
+    # add # of tests formula
+    # refactor to a function
+    for row in ws.iter_rows(min_row=3,
+                            min_col=COLS.index("FAILED_NO"),
+                            max_col=COLS.index("FAILED_NO"),
+                            max_row=ws.max_row):
+        for cell in row:
+            leadCell = cell.offset(column=-3)
+            if leadCell in suiteCells:
+                suiteLength = getSuiteRowLen(leadCell, ws)
+                offset = 0 if not suiteLength else 1
+                if suiteLength:
+                    cell.value = "=SUM({0}{1}:{0}{2})".format(cell.column,
+                                                              str(cell.row+offset),
+                                                              str(cell.row+suiteLength))
+                else:
+                    cell.value = 0
+
+    # add total # tests formula for suite
+    # refactor to a function
+    testCells = []
+    for row in ws.iter_rows(min_row=3,
+                            min_col=COLS.index("TEST_NO"),
+                            max_col=COLS.index("TEST_NO"),
+                            max_row=ws.max_row):
+        for cell in row:
+            leadCell = cell.offset(column=-2)
+            if leadCell in suiteCells:
+                testCells.append(cell.coordinate)
+    totalTest = ws['C2']
+    totalTest.value = '=SUM({})'.format(','.join(testCells))
+
+    # add total # failures formula for suite
+    # refactor to a function
+    failedCells = []
+    for row in ws.iter_rows(min_row=3,
+                            min_col=COLS.index("FAILED_NO"),
+                            max_col=COLS.index("FAILED_NO"),
+                            max_row=ws.max_row):
+        for cell in row:
+            leadCell = cell.offset(column=-3)
+            if leadCell in suiteCells:
+                failedCells.append(cell.coordinate)
+    totalFailure = ws['D2']
+    totalFailure.value = '=SUM({})'.format(','.join(failedCells))
+
+    # data validation for the manual testing column
+    ws.add_data_validation(manualTestingDv)
+    for row in ws.iter_rows(min_row=4,
+                            min_col=COLS.index("MANUAL_TEST"),
+                            max_col=COLS.index("MANUAL_TEST"),
+                            max_row=ws.max_row):
+        for cell in row:
+            leadCell = cell.offset(column=-8)
+            if not leadCell in suiteCells:
+                manualTestingDv.ranges.append(cell.coordinate)
+
     #save file
     wb.save(reportFileName)
 
@@ -648,12 +798,10 @@ def getJsonFile(link):
     r = requests.get(link)
     if r.status_code != 200:
         print("Error reading JSON on {}, returned {}".format(link, r.status_code))
-#        sys.exit(1)
     try:
         data = r.json()
     except ValueError:
         print("Error reading JSON on {}, Jenkins test might be in progress".format(link))
-#        sys.exit(1)
     return data
 
 
@@ -681,14 +829,31 @@ def addSkipped(suite):
             if feature['name'] in table:
                 # step thru every scenario that skipped
                 for scenario in table[feature['name']]:
-                    scenarioWithPrefix = ' '.join(('Scenario:'+scenario).split())
-                    if not scenarioWithPrefix in feature['failureList']:
-                        feature['failureList'].append(scenarioWithPrefix)
-                        feature['failures'][scenarioWithPrefix] = {'scenario': scenarioWithPrefix,
-                                                                   'step'    : 'has skipped steps'}
-                        feature['failedSteps'].append('has skipped steps')
-                        feature['failed'] += 1
+                    sanitizedScenario = ' '.join(scenario.split())
+                    # check if skipped scenario is in the fail list
+                    if not sanitizedScenario in feature['failureList']:
+                        feature['skipList'].append(sanitizedScenario)
 
+def addFailedCellFormula(cell, rowLen=0):
+    failedCell = cell.offset(column=3,)
+    failedCell.value='=COUNTIF(I{0}:I{1},"Failed" )+COUNTA(F{0}:F{1})'.format(cell.row,
+                                                                             cell.row+rowLen)
+
+
+def getSuiteRowLen(startCell, ws):
+    ''' returns row length of the suite '''
+    length = 0
+    allSuites = getAllSuites(ws)
+    for row in ws.iter_rows(min_row=startCell.row+1,
+                            min_col=COLS.index("TEST_NAME"),
+                            max_col=COLS.index("TEST_NAME"),
+                            max_row=ws.max_row):
+        for cell in row:
+            if cell not in allSuites:
+                length += 1
+            else:
+                return length
+    return length            
 
 if __name__ == '__main__':
 
@@ -705,6 +870,7 @@ if __name__ == '__main__':
         from openpyxl.formatting.rule import CellIsRule
         from openpyxl.utils import get_column_letter, rows_from_range
         from openpyxl.utils import units
+        from openpyxl.worksheet.datavalidation import DataValidation
         from selenium import webdriver as wd
     except ImportError:
         print("Not in venv, starting new subprocess call")
