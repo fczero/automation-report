@@ -126,6 +126,12 @@ def processBoth():
         p.join()
     sys.exit(0)
 
+
+def is_venv():
+    return (hasattr(sys, 'real_prefix') or
+            (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+
+
 def worker(tag):
     fileName = os.path.basename(__file__)
     return mp.Process(target=subprocess.call, args=([PY, fileName, tag],))
@@ -150,7 +156,7 @@ def build_paths():
 
 build_paths()
 #janky bootsrap implementation
-if not os.path.isdir(os.path.join('.', ENV)):
+if not is_venv():
     #create virtual environment
     venv.create(ENV, with_pip=True)
     if sys.platform != "win32":
@@ -861,7 +867,7 @@ if __name__ == '__main__':
     arghandler()
 
     # virtual env installed libraries
-    try:
+    if is_venv():
         from openpyxl import Workbook
         from openpyxl.styles import colors
         from openpyxl.styles import Color, PatternFill, Font, Border, NamedStyle
@@ -872,14 +878,14 @@ if __name__ == '__main__':
         from openpyxl.utils import units
         from openpyxl.worksheet.datavalidation import DataValidation
         from selenium import webdriver as wd
-    except ImportError:
+        import json
+        import requests
+    else:
         print("Not in venv, starting new subprocess call")
         p = worker(sys.argv[1])
         p.start()
         sys.exit(0)
 
-    import json
-    import requests
 
     initStyles()
     checkCompat()
