@@ -93,7 +93,7 @@ def arghandler():
     if len(sys.argv) == 1:
         parser.print_help()
         print(steps)
-        sys.exit(1)
+        sys.exit(0)
 
     if args.smoke or args.test: 
         automationReport = 'RCO Smoke Tests'
