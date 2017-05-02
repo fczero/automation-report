@@ -867,7 +867,7 @@ if __name__ == '__main__':
     arghandler()
 
     # virtual env installed libraries
-    if is_venv():
+    try:
         from openpyxl import Workbook
         from openpyxl.styles import colors
         from openpyxl.styles import Color, PatternFill, Font, Border, NamedStyle
@@ -878,14 +878,14 @@ if __name__ == '__main__':
         from openpyxl.utils import units
         from openpyxl.worksheet.datavalidation import DataValidation
         from selenium import webdriver as wd
-        import json
-        import requests
-    else:
+    except ImportError:
         print("Not in venv, starting new subprocess call")
         p = worker(sys.argv[1])
         p.start()
         sys.exit(0)
 
+    import json
+    import requests
 
     initStyles()
     checkCompat()
