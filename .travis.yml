@@ -4,4 +4,4 @@ python:
   - "3.5"
 #before_install:
 # - sudo apt-get install python3-venv
-script: ./ccp_daily_automation.py
+script: ./ccp_daily_automation.py -t
