@@ -150,7 +150,7 @@ def build_paths():
         BIN = os.path.join(ENV, 'bin')
     PIP = os.path.join(BIN,'pip')
     if sys.platform == "win32":
-        PY  = os.path.join(BIN,'python')
+        PY  = os.path.join(BIN,'python.exe')
     else:
         PY  = os.path.join(BIN,'python3')
 
