@@ -111,7 +111,7 @@ def arghandler():
              'Review']
     if args.test:
         pprint(args)
-        nodes = ['Authentication']
+        nodes = ['Payment']
         devices = ['Desktop']
 
 def processBoth():
@@ -833,12 +833,13 @@ def addSkipped(suite):
         table = scrapeSkippedFromJSON(getJsonFile(link))
         for feature in node['features']:
             if feature['name'] in table:
+                # todo: refactor this monstrosity
                 # step thru every scenario that skipped
                 for scenario in table[feature['name']]:
-                    sanitizedScenario = ' '.join(scenario.split())
+                    sanitizedScenario = 'Scenario:'+' '.join(scenario.split())
                     # check if skipped scenario is in the fail list
                     if not sanitizedScenario in feature['failureList']:
-                        feature['skipList'].append(sanitizedScenario)
+                        feature['skipList'].append(sanitizedScenario[9:])
 
 def addFailedCellFormula(cell, rowLen=0):
     failedCell = cell.offset(column=3,)
