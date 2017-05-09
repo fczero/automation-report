@@ -22,7 +22,5 @@ class testScript(unittest.TestCase):
     def setUp(self):
         pass
 
-    def 
-
 if __name__ == "__main__":
     unittest.main()
