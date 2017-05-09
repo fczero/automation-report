@@ -2,6 +2,9 @@ language: python
 python:
   - "3.4"
   - "3.5"
-#before_install:
-# - sudo apt-get install python3-venv
-script: ./ccp_daily_automation.py -t
+install:
+    pip install --upgrade pip
+    pip install selenium
+    pip install openpyxl
+    pip install reqeusts
+script: ./test.py
