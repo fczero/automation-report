@@ -28,6 +28,7 @@ import subprocess
 import multiprocessing as mp
 import venv
 import argparse
+import re
 from pprint import pprint
 
 # Global Values
@@ -95,10 +96,12 @@ def arghandler():
         print(steps)
         sys.exit(0)
 
-    if args.smoke or args.test: 
+#    if args.smoke or args.test: 
+    if args.smoke: 
         automationReport = 'RCO Smoke Tests'
         reportFileName = 'RCO_Smoke_Report'
-    elif args.regression:
+#    elif args.regression:
+    elif args.regression or args.test:
         automationReport = 'RCO Regression Tests'
         reportFileName = 'RCO_Smokeless_Regression_Report'
     elif args.both:
@@ -154,22 +157,20 @@ def build_paths():
     else:
         PY  = os.path.join(BIN,'python3')
 
+def prepenv(package):
+    shellopt = False if sys.platform != "win32" else True
+    args = [PIP, 'install'] + package
+    subprocess.call(args, shell=shellopt)
+
 build_paths()
 #janky bootsrap implementation
 if not is_venv():
     #create virtual environment
     venv.create(ENV, with_pip=True)
-    if sys.platform != "win32":
-        subprocess.call([PIP, 'install', '--upgrade','pip'])
-        subprocess.call([PIP, 'install', 'selenium'])
-        subprocess.call([PIP, 'install', 'openpyxl'])
-        subprocess.call([PIP, 'install', 'requests'])
-    else:
-        subprocess.call([PIP, 'install', '--upgrade','pip'], shell=True)
-        subprocess.call([PIP, 'install', 'selenium'], shell=True)
-        subprocess.call([PIP, 'install', 'openpyxl'], shell=True)
-        subprocess.call([PIP, 'install', 'requests'], shell=True)
-
+    prepenv(['--upgrade','pip'])
+    prepenv(['selenium'])
+    prepenv(['openpyxl'])
+    prepenv(['requests'])
 
 def checkCompat():
     compatible = True
@@ -188,20 +189,17 @@ def open_file(filename):
         opener ="open" if sys.platform == "darwin" else "xdg-open"
         subprocess.call([opener, filename])
 
-def getFeatureFileName(string):
-    if string[0] == '(':
+def getFeatureFileName(input):
+    if input[0] == '(':
         cutoff = 0
-        for char in string:
+        for char in input:
             if char == ')':
-                return string[1:cutoff]
+                return input[1:cutoff]
             cutoff += 1
 
-def remUnderscore(string):
-    final = ''
-    for char in string:
-        if char != '_':
-            final += char
-    return final
+def remUnderscore(input):
+    return ''.join(input.split('_'))
+
 
 def cellLineBreak(stringList):
     if len(stringList) == 0:
@@ -215,32 +213,14 @@ def cellLineBreak(stringList):
         final += '\n' + stringList[i]
     return final + '"'
 
-def duration(string):
-    draft = ''
-    digits = '1234567890'
-    letters = 'hmis'
-    for char in string:
-        if char in digits:
-            draft += char
-        if char in letters:
-            draft += char
-    final = ''
-    lastChar = ''
-    for char in draft:
-        if char == 's':
-            if lastChar == 'm':
-                final += char
-            if lastChar in digits:
-                final += char
-        elif char in digits:
-            if lastChar not in digits:
-                final += ' ' + char
-            else:
-                final += char
-        else:
-            final += char
-        lastChar = char
-    return final
+
+def duration(input):
+    unit  = ['hour', 'min', 'sec', 'ms']
+    nunit = ['h', 'mi', 's', 'ms']
+    for k,v in dict(zip(unit, nunit)).items():
+        input = re.sub(r'\s%ss?'%k,v,input)
+    return ' '.join(input.split(' and '))
+
 
 def mergeCells(ws, cell, length):
     mergeStart = cell.row
@@ -391,6 +371,14 @@ def initStyles():
     manualTestingDv = DataValidation(type="list", formula1='"PASSED,FAILED"', allow_blank=True)
     
 
+def fixPrefix(text):
+    retval = ''
+    if text.startswith('Scenario:'):
+        retval =  text[9:]
+    elif text.startswith('Background:'):
+        retval = 'Background Step'
+    return retval
+
 def scrapeInfo():
     global suite
     global devices
@@ -451,36 +439,7 @@ def scrapeInfo():
                 feature['failedSteps'].append(steps[num].text)
 
             feature['skipList'] = []
-            #scraping skipped
-#            skips = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-keyword']")
-#            feature['skipped'] = len(skips)
-#            node['skipped'] += feature['skipped']
-#            suite['skipped'] += feature['skipped']
-# WIP
-#            scenarios = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
-#            steps = driver.find_elements_by_xpath("//div[@class='skipped']/span[@class='step-name']")
-#            feature['skipList'] = []
-#            feature['skippedSteps'] = []
-#            feature['skips'] = {}
-#            count = 0
-#            for num in range(len(skips)):
-#                if skips[num].text == 'Background:':
-#                    feature['skipList'].append(skips[num].text)
-#                    feature['skips'][skips[num].text] = {'scenario': skips[num].text ,
-#                                                               'step': steps[num].text}
-#                else:
-#                    feature['skipList'].append(skips[num].text +
-#                                                  scenarios[count].text)
-#                    feature['skips'][skips[num].text +
-#                                        scenarios[count].text] = {'scenario': skips[num].text +
-#                                                                  scenarios[count].text,
-#                                                                  'step': steps[num].text}
-#                    count += 1
-#                feature['skippedSteps'].append(steps[num].text)
-# WIP end
-            #add to scraped info to list
             features.append(feature)
-            #leaving feature page
             driver.back()
         node['features'] = features
         driver.back()
@@ -578,14 +537,14 @@ def writeToExcelFile(suite):
                 if count:
                     ws.cell(row=ws.max_row,
                             column=COLS.index("FAILED_SCENARIOS"),
-                            value=feature['failures'][failure]['scenario'][9:])
+                            value=fixPrefix(feature['failures'][failure]['scenario']))
                     ws.cell(row=ws.max_row,
                             column=COLS.index("FAILED_STEPS"),
                             value=feature['failures'][failure]['step'])
                     count = False
                 else:
                     ws.append(
-                        {COLS.index("FAILED_SCENARIOS"): feature['failures'][failure]['scenario'][9:],
+                        {COLS.index("FAILED_SCENARIOS"): fixPrefix(feature['failures'][failure]['scenario']),
                         COLS.index("FAILED_STEPS"): feature['failures'][failure]['step']})
 
             for skip in feature['skipList']:
@@ -813,7 +772,7 @@ def getJsonFile(link):
 
 def scrapeSkippedFromJSON(data):
     ''' returns dictionary of unique scenarios with skips '''
-    out = {}
+    skips = {}
     for suite in data:
         if 'elements' in suite:
             skipScenarios = []
@@ -823,8 +782,8 @@ def scrapeSkippedFromJSON(data):
                         if element['name']:
                             skipScenarios.append(element['name'])
                 if skipScenarios:
-                    out[suite['name']] = set(skipScenarios)
-    return out
+                    skips[suite['name']] = set(skipScenarios)
+    return skips
 
 
 def addSkipped(suite):
@@ -839,7 +798,7 @@ def addSkipped(suite):
                     sanitizedScenario = 'Scenario:'+' '.join(scenario.split())
                     # check if skipped scenario is in the fail list
                     if not sanitizedScenario in feature['failureList']:
-                        feature['skipList'].append(sanitizedScenario[9:])
+                        feature['skipList'].append(fixPrefix(sanitizedScenario))
 
 def addFailedCellFormula(cell, rowLen=0):
     failedCell = cell.offset(column=3,)
@@ -879,15 +838,13 @@ if __name__ == '__main__':
         from openpyxl.utils import units
         from openpyxl.worksheet.datavalidation import DataValidation
         from selenium import webdriver as wd
+        import json
+        import requests
     except ImportError:
         print("Not in venv, starting new subprocess call")
         p = worker(sys.argv[1])
         p.start()
         sys.exit(0)
-
-    import json
-    import requests
-
     initStyles()
     checkCompat()
     scrapeInfo()
