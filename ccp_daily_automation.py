@@ -5,7 +5,7 @@
 # #
 # #      1.      Login to the VPN
 # #      2.a     Add executable permission using chmod
-# #              Ex. $chmod 775 ccp_daily_automation.py
+# #              Ex. $chmod 755 ccp_daily_automation.py
 # #      3       Run using $./ccp_daily_automation.py
 # #        OR
 # #      2.b     Run using $python3 ccp_daily_automation.py
@@ -73,7 +73,7 @@ def arghandler():
      How to run:
       1.a     Login to the VPN
       1.b     Add executable permission using chmod
-                  Ex. $chmod 775 {}
+                  Ex. $chmod 755 {}
       2.a     Run using $./{}
          OR
       2.b     Run using $python3 {}""".format(fName, fName, fName)
@@ -636,6 +636,9 @@ def writeToExcelFile(suite):
     #size all the columns
     for  i in range(1, COLS.index("DURATION")):
         resizeToFitColumn(ws, i)
+
+    #resize failed column
+    ws.column_dimensions['D'].width = ws.column_dimensions['C'].width + 1
 
     #resize duration column
     resizeColumn(ws, COLS.index("DURATION"), DURATION_COL_LEN)
