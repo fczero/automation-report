@@ -1,3 +1,4 @@
 selenium
 openpyxl
 requests
+python-coveralls
