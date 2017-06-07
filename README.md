@@ -1,7 +1,7 @@
 # automation-report
 
 [![Build Status](https://travis-ci.org/fczero/automation-report.svg?branch=master)](https://travis-ci.org/fczero/automation-report)
-
+[![Coverage Status](https://coveralls.io/repos/github/fczero/automation-report/badge.svg?branch=master)](https://coveralls.io/github/fczero/automation-report?branch=master)
 Jenkins Cucumber Report scraper to XLSX.
 ## Getting Started
 
